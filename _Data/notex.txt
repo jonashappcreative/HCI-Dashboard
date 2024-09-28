@@ -1,0 +1,117 @@
+// Use DBML to define your database structure
+// Docs: https://dbml.dbdiagram.io/docs
+
+Table articles {
+  article_id integer [primary key, increment]
+  arxiv_id varchar [unique, not null, note: 'Unique ID from ArXiv']
+  title text [not null, note: 'Title of the article']
+  abstract text [note: 'Abstract of the article']
+  summary text [note: 'GenAI Summary of the article']
+  published timestamp [note: 'Publication date of the article']
+  updated timestamp [note: 'Last updated date of the article']
+  doi varchar [note: 'Digital Object Identifier of the article']
+  pdf_link varchar [note: 'Link to the article PDF']
+  html_link varchar [note: 'Link to the article HTML page']
+  primary_category varchar [note: 'Primary category of the article']
+  total_results integer [note: 'Total number of results from the query']
+  search_query text [note: 'The search query used in the API request']
+  favorites integer [note: 'Sum of people, who marked articles as favorite']
+
+}
+
+Table queries {
+  query_id integer [primary key, increment]
+  search_query text [not null, note: 'Search query string used in the API']
+  created_at timestamp [note: 'When the query was executed']
+}
+
+Table authors {
+  author_id integer [primary key, increment]
+  name varchar [not null, note: 'Name of the author']
+  university_id integer [not null, note: 'Reference to the university']
+}
+
+Table universities {
+  university_id integer [primary key, increment]
+  name varchar [not null, unique, note: 'Name of the university']
+  location varchar [note: 'Location of the university']
+}
+
+// many to many relationship between articles and authors
+// each row is a relationship between article and author
+Table article_authors {
+  article_id integer [not null, note: 'ID of the article']
+  author_id integer [not null, note: 'ID of the author']
+  contribution text [default: null, note: 'Author’s contribution to the article']
+  primary_author boolean [default: false, note: 'Indicates if the author is the primary author']
+
+  // Composite primary key to enforce unique pairs
+  indexes {
+    (article_id, author_id) [unique]
+  }
+}
+
+Table keywords {
+  keyword_id integer [primary key, increment]
+  keyword varchar [not null, unique, note: 'The keyword associated with articles']
+}
+
+// Associative table for articles and keywords
+Table article_keywords {
+  article_id integer [not null, note: 'ID of the article']
+  keyword_id integer [not null, note: 'ID of the keyword']
+
+  indexes {
+    (article_id, keyword_id) [unique]
+  }
+}
+
+Table users {
+  user_id integer [primary key, increment]
+  username varchar [not null, unique, note: 'Username of the user']
+  password_hash varchar [not null, note: 'Hashed password for security']
+  date_created timestamp [note: 'When the user account was created']
+  license boolean [default: false, note: 'Indicates if the user has an active license (true/false)']
+  favorites text [note: 'Comma-separated list of article_ids which are marked favorite']
+  university_id integer [note: 'Affiliation to university']
+  author_id integer [default: null, note: 'User gets author_id once they uploaded an article']
+}
+
+Table comments {
+  comment_id integer [primary key, increment]
+  article_id integer [not null, note: 'ID of the article being commented on']
+  user_id integer [not null, note: 'ID of the user who made the comment']
+  content text [not null, note: 'The content of the comment']
+  created_at timestamp [note: 'Timestamp when the comment was made']
+
+  // Composite index to ensure each user can comment multiple times on an article
+  indexes {
+    (article_id, user_id)
+  }
+}
+
+Table favorites {
+  user_id integer [not null, note: 'ID of the user who favorited the article']
+  article_id integer [not null, note: 'ID of the favorited article']
+  favorited_at timestamp [note: 'Timestamp when the article was marked as a favorite']
+
+  // Composite primary key to ensure each user can favorite an article only once
+  indexes {
+    (user_id, article_id) [unique]
+  }
+}
+
+
+// Establish relationships
+Ref: articles.search_query > queries.search_query
+Ref: authors.university_id > universities.university_id    // Each author belongs to one university
+Ref: article_authors.article_id > articles.article_id      // Each article can have multiple authors
+Ref: article_authors.author_id > authors.author_id         // Each author can contribute to multiple articles
+Ref: comments.article_id > articles.article_id             // Comments belong to articles
+Ref: comments.user_id > users.user_id                      // Comments are made by users
+Ref: favorites.user_id > users.user_id                     // Each favorite is linked to a user
+Ref: favorites.article_id > articles.article_id            // Each favorite is linked to an article
+Ref: universities.university_id < users.university_id      // A user can be affiliated or work at a university
+Ref: users.author_id - authors.author_id                   // Connects an author with it's user
+Ref: article_keywords.article_id > articles.article_id     // Connects articles and keywords
+Ref: article_keywords.keyword_id > keywords.keyword_id     // Connects keywords to articles
